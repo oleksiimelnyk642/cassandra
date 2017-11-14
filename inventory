@@ -1,0 +1,2 @@
+[all]
+cnode3.local ansible_host=192.168.11.13 ansible_user=vagrant ansible_ssh_private_key_file=/home/vagrant/.ssh/testkey

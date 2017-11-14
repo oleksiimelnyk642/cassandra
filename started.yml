@@ -1,0 +1,6 @@
+---
+
+- name: Install cassandra
+  hosts: all
+  roles: 
+    - cassandra
