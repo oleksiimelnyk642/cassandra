@@ -1,0 +1,653 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "CassandraCloudFormationTemplate",
+  "Parameters" : {
+    "InstanceTypeParameter" : {
+      "Type" : "String",
+      "Default" : "t2.micro"
+    },
+    "CassandraImageIdParameter" : {
+      "Type" : "String",
+      "Default" : "ami-9e032cfb"
+    },
+    "KeyNameParameter" : {
+      "Type" : "String",
+      "Default" : "yourPrivateKey"
+    }
+  },
+  "Mappings" : {
+    "RegionMap" : {
+      "us-east-2" : { "BastionImageId" : "ami-c5062ba0" },
+      "us-west-2" : { "BastionImageId" : "ami-32d8124a" },
+      "eu-west-1" : { "BastionImageId" : "ami-760aaa0f" }
+    }
+  },
+  "Resources": {
+    "vpcMain": {
+      "Type": "AWS::EC2::VPC",
+      "Properties": {
+        "CidrBlock": "10.0.0.0/16",
+        "InstanceTenancy": "default",
+        "EnableDnsSupport": "true",
+        "EnableDnsHostnames": "true",
+        "Tags": [
+          {
+            "Key": "development",
+            "Value": "cassandra-test"
+          }
+       ]
+      }
+    },
+    "subnetPublic1": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "CidrBlock": "10.0.4.0/28",
+        "AvailabilityZone": { "Fn::Select" : [ "0", { "Fn::GetAZs" : "" } ] },
+        "VpcId": {
+          "Ref": "vpcMain"
+        },
+        "Tags": [
+          {
+            "Key": "development",
+            "Value": "cassandra-test"
+          },
+          {
+            "Key": "Name",
+            "Value": "Public subnet 1"
+          }
+        ]
+      }
+    },
+    "subnetPublic2": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "CidrBlock": "10.0.5.0/28",
+        "AvailabilityZone": { "Fn::Select" : [ "1", { "Fn::GetAZs" : "" } ] },
+        "VpcId": {
+          "Ref": "vpcMain"
+        },
+        "Tags": [
+          {
+            "Key": "development",
+            "Value": "cassandra-test"
+          },
+          {
+            "Key": "Name",
+            "Value": "Public subnet 2"
+          }
+        ]
+      }
+    },
+    "subnetPublic3": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "CidrBlock": "10.0.6.0/28",
+        "AvailabilityZone": { "Fn::Select" : [ "2", { "Fn::GetAZs" : "" } ] },
+        "VpcId": {
+          "Ref": "vpcMain"
+        },
+        "Tags": [
+          {
+            "Key": "development",
+            "Value": "cassandra-test"
+          },
+          {
+            "Key": "Name",
+            "Value": "Public subnet 3"
+          }
+        ]
+      }
+    },
+    "subnetPrivate1": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "CidrBlock": "10.0.1.0/24",
+        "AvailabilityZone": { "Fn::Select" : [ "0", { "Fn::GetAZs" : "" } ] },
+        "VpcId": {
+          "Ref": "vpcMain"
+        },
+        "Tags": [
+          {
+            "Key": "development",
+            "Value": "cassandra-test"
+          },
+          {
+            "Key": "Name",
+            "Value": "Private subnet 1"
+          }
+        ]
+      }
+    },
+    "subnetPrivate2": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "CidrBlock": "10.0.2.0/24",
+        "AvailabilityZone": { "Fn::Select" : [ "1", { "Fn::GetAZs" : "" } ] },
+        "VpcId": {
+          "Ref": "vpcMain"
+        },
+        "Tags": [
+          {
+            "Key": "development",
+            "Value": "cassandra-test"
+          },
+          {
+            "Key": "Name",
+            "Value": "Private subnet 2"
+          }
+        ]
+      }
+    },
+    "subnetPrivate3": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "CidrBlock": "10.0.3.0/24",
+        "AvailabilityZone": { "Fn::Select" : [ "2", { "Fn::GetAZs" : "" } ] },
+        "VpcId": {
+          "Ref": "vpcMain"
+        },
+        "Tags": [
+          {
+            "Key": "development",
+            "Value": "cassandra-test"
+          },
+          {
+            "Key": "Name",
+            "Value": "Private subnet 3"
+          }
+        ]
+      }
+    },
+    "internetGateway": {
+      "Type": "AWS::EC2::InternetGateway",
+      "Properties": {
+      }
+    },
+    "InternetGatewayAttachment" : {
+      "Type" : "AWS::EC2::VPCGatewayAttachment",
+      "Properties" : {
+        "VpcId" : {"Ref" : "vpcMain"},
+        "InternetGatewayId" : {"Ref" : "internetGateway"}
+        }
+    },
+    "NAT1": {
+      "Type" : "AWS::EC2::NatGateway",
+      "Properties" : {
+        "AllocationId" : { "Fn::GetAtt" : ["EIP1", "AllocationId"]},
+        "SubnetId" : { "Ref" : "subnetPublic1"},
+        "Tags" : [ {"Key" : "Name", "Value" : "NATGateway1" } ]
+      }
+    },
+    "EIP1": {
+      "Type" : "AWS::EC2::EIP",
+      "Properties" : {
+        "Domain" : "vpc"
+      }
+    },
+    "Route1": {
+      "Type" : "AWS::EC2::Route",
+      "Properties" : {
+        "RouteTableId" : { "Ref" : "RouteTable1" },
+        "DestinationCidrBlock" : "0.0.0.0/0",
+        "NatGatewayId" : { "Ref" : "NAT1" }
+      }
+    },
+    "RouteTable1": {
+      "Type": "AWS::EC2::RouteTable",
+      "Properties": {
+        "VpcId": {
+          "Ref": "vpcMain"
+        },
+        "Tags": [
+          {
+            "Key": "development",
+            "Value": "cassandra-test"
+          }
+        ]
+      }
+    },
+    "RouteTable1Association": {
+      "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties" : {
+         "RouteTableId" : { "Ref" : "RouteTable1" },
+         "SubnetId" : { "Ref" : "subnetPrivate1" }
+       }
+    },   
+    "NAT2": {
+      "Type" : "AWS::EC2::NatGateway",
+      "Properties" : {
+        "AllocationId" : { "Fn::GetAtt" : ["EIP2", "AllocationId"]},
+        "SubnetId" : { "Ref" : "subnetPublic2"},
+        "Tags" : [ {"Key" : "Name", "Value" : "NATGateway2" } ]
+      }
+    },
+    "EIP2": {
+      "Type" : "AWS::EC2::EIP",
+      "Properties" : {
+        "Domain" : "vpc"
+      }
+    },
+    "Route2": {
+      "Type" : "AWS::EC2::Route",
+      "Properties" : {
+        "RouteTableId" : { "Ref" : "RouteTable2" },
+        "DestinationCidrBlock" : "0.0.0.0/0",
+        "NatGatewayId" : { "Ref" : "NAT2" }
+      }
+    },
+    "RouteTable2": {
+      "Type": "AWS::EC2::RouteTable",
+      "Properties": {
+        "VpcId": {
+          "Ref": "vpcMain"
+        },
+        "Tags": [
+          {
+            "Key": "development",
+            "Value": "cassandra-test"
+          }
+        ]
+      }
+    },
+    "RouteTable2Association": {
+      "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties" : {
+         "RouteTableId" : { "Ref" : "RouteTable2" },
+         "SubnetId" : { "Ref" : "subnetPrivate2" }
+       }
+    }, 
+    "NAT3": {
+      "Type" : "AWS::EC2::NatGateway",
+      "Properties" : {
+        "AllocationId" : { "Fn::GetAtt" : ["EIP3", "AllocationId"]},
+        "SubnetId" : { "Ref" : "subnetPublic3"},
+        "Tags" : [ {"Key" : "Name", "Value" : "NATGateway3" } ]
+      }
+    },
+    "EIP3": {
+      "Type" : "AWS::EC2::EIP",
+      "Properties" : {
+        "Domain" : "vpc"
+      }
+    },
+    "Route3": {
+      "Type" : "AWS::EC2::Route",
+      "Properties" : {
+        "RouteTableId" : { "Ref" : "RouteTable3" },
+        "DestinationCidrBlock" : "0.0.0.0/0",
+        "NatGatewayId" : { "Ref" : "NAT3" }
+      }
+    },
+    "RouteTable3": {
+      "Type": "AWS::EC2::RouteTable",
+      "Properties": {
+        "VpcId": {
+          "Ref": "vpcMain"
+        },
+        "Tags": [
+          {
+            "Key": "development",
+            "Value": "cassandra-test"
+          }
+        ]
+      }
+    },
+    "RouteTable3Association": {
+      "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties" : {
+         "RouteTableId" : { "Ref" : "RouteTable3" },
+         "SubnetId" : { "Ref" : "subnetPrivate3" }
+       }
+    }, 
+    "Route4": {
+      "DependsOn" : "InternetGatewayAttachment",
+      "Type" : "AWS::EC2::Route",
+      "Properties" : {
+        "RouteTableId" : { "Ref" : "RouteTable4" },
+        "DestinationCidrBlock" : "0.0.0.0/0",
+        "GatewayId" : { "Ref" : "internetGateway" }
+      }
+    },
+    "RouteTable4": {
+      "Type": "AWS::EC2::RouteTable",
+      "Properties": {
+        "VpcId": {
+          "Ref": "vpcMain"
+        },
+        "Tags": [
+          {
+            "Key": "development",
+            "Value": "cassandra-test"
+          }
+        ]
+      }
+    },
+    "RouteTable41Association": {
+      "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties" : {
+         "RouteTableId" : { "Ref" : "RouteTable4" },
+         "SubnetId" : { "Ref" : "subnetPublic1" }            
+       }
+    }, 
+    "RouteTable42Association": {
+      "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties" : {
+         "RouteTableId" : { "Ref" : "RouteTable4" },
+         "SubnetId" : { "Ref" : "subnetPublic2" }            
+       }
+    }, 
+    "RouteTable43Association": {
+      "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties" : {
+         "RouteTableId" : { "Ref" : "RouteTable4" },
+         "SubnetId" : { "Ref" : "subnetPublic3" }           
+       }
+    }, 
+    "CassandraSG" : {
+       "Type" : "AWS::EC2::SecurityGroup",
+       "Properties" : {
+          "GroupDescription" : "Allow access to instances, which are in private subnets",
+          "VpcId" : {"Ref" : "vpcMain"},
+          "SecurityGroupIngress" : [{
+                "IpProtocol" : "tcp",
+                "FromPort" : "22",
+                "ToPort" : "22",
+                "CidrIp" : "10.0.4.0/28"
+             },
+             {  "IpProtocol" : "tcp",
+                "FromPort" : "22",
+                "ToPort" : "22",
+                "CidrIp" : "10.0.5.0/28"
+             },
+             {  "IpProtocol" : "tcp",
+                "FromPort" : "22",
+                "ToPort" : "22",
+                "CidrIp" : "10.0.6.0/28"
+             },
+              {
+                "IpProtocol" : "tcp",
+                "FromPort" : "7000",
+                "ToPort" : "7000",
+                "CidrIp" : "10.0.1.0/24"
+              },
+              {
+                "IpProtocol" : "tcp",
+                "FromPort" : "7001",
+                "ToPort" : "7001",
+                "CidrIp" : "10.0.1.0/24"
+              },
+              {
+                "IpProtocol" : "tcp",
+                "FromPort" : "7199",
+                "ToPort" : "7199",
+                "CidrIp" : "10.0.1.0/24"
+              },
+              {
+                "IpProtocol" : "tcp",
+                "FromPort" : "9042",
+                "ToPort" : "9042",
+                "CidrIp" : "10.0.1.0/24"
+              },
+              {
+                "IpProtocol" : "tcp",
+                "FromPort" : "7000",
+                "ToPort" : "7000",
+                "CidrIp" : "10.0.2.0/24"
+              },
+              {
+                "IpProtocol" : "tcp",
+                "FromPort" : "7001",
+                "ToPort" : "7001",
+                "CidrIp" : "10.0.2.0/24"
+              },
+              {
+                "IpProtocol" : "tcp",
+                "FromPort" : "7199",
+                "ToPort" : "7199",
+                "CidrIp" : "10.0.2.0/24"
+              },
+              {
+                "IpProtocol" : "tcp",
+                "FromPort" : "9042",
+                "ToPort" : "9042",
+                "CidrIp" : "10.0.2.0/24"
+              },
+              {
+                "IpProtocol" : "tcp",
+                "FromPort" : "7000",
+                "ToPort" : "7000",
+                "CidrIp" : "10.0.3.0/24"
+              },
+              {
+                "IpProtocol" : "tcp",
+                "FromPort" : "7001",
+                "ToPort" : "7001",
+                "CidrIp" : "10.0.3.0/24"
+              },
+              {
+                "IpProtocol" : "tcp",
+                "FromPort" : "7199",
+                "ToPort" : "7199",
+                "CidrIp" : "10.0.3.0/24"
+              },
+              {
+                "IpProtocol" : "tcp",
+                "FromPort" : "9042",
+                "ToPort" : "9042",
+                "CidrIp" : "10.0.3.0/24"
+              },
+              {
+                "IpProtocol" : "tcp",
+                "FromPort" : "9160",
+                "ToPort" : "9160",
+                "CidrIp" : "0.0.0.0/0"
+              }
+           ]
+       }
+    },
+    "BastionSG" : {
+       "Type" : "AWS::EC2::SecurityGroup",
+       "Properties" : {
+          "GroupDescription" : "Allow access to Bastion instance",
+          "VpcId" : {"Ref" : "vpcMain"},
+          "SecurityGroupIngress" : [{
+                "IpProtocol" : "tcp",
+                "FromPort" : "22",
+                "ToPort" : "22",
+                "CidrIp" : "0.0.0.0/0"
+             },
+             {
+                "IpProtocol" : "tcp",
+                "FromPort" : "9160",
+                "ToPort" : "9160",
+                "CidrIp" : "0.0.0.0/0"
+              }
+           ]
+       }
+    },
+    "EIPBastion": {
+      "Type" : "AWS::EC2::EIP",
+      "Properties" : {
+          "InstanceId" : { "Ref" : "Ec2InstanceBastion" }
+      }
+    },
+    "Ec2InstanceBastion" : {
+      "Type" : "AWS::EC2::Instance",
+      "Properties" : {
+        "ImageId" : { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "BastionImageId" ]},
+        "KeyName" : { "Ref" : "KeyNameParameter" },
+        "InstanceType" : { "Ref" : "InstanceTypeParameter" },
+        "SecurityGroupIds": [ { "Ref" : "BastionSG" } ],
+        "SubnetId" : { "Ref" : "subnetPublic1" }
+      }
+    },
+    "DatabaseLoadBalancer": {
+      "Type": "AWS::ElasticLoadBalancing::LoadBalancer",
+      "Properties": {
+        "LoadBalancerName": "DatabaseLoadBalancer",
+        "Scheme": "internet-facing",
+        "Listeners": [
+          {
+            "LoadBalancerPort": "9160",
+            "InstancePort": "9160",
+            "Protocol": "TCP",
+            "InstanceProtocol" : "TCP"
+          }],
+        "Instances" : [ { "Ref" : "Ec2InstanceSeed1" }, { "Ref" : "Ec2InstanceSeed2" }, { "Ref" : "Ec2InstanceSeed3" } ],
+        "SecurityGroups": [ { "Ref" : "BastionSG" } ],
+        "Subnets": [
+            {
+                "Ref": "subnetPublic1"
+            },
+            {
+                "Ref": "subnetPublic2"
+            },
+            {
+                "Ref": "subnetPublic3"
+            }
+          ]
+      }
+    },
+    "Ec2InstanceSeed1" : {
+      "Type" : "AWS::EC2::Instance",
+      "Properties" : {
+        "ImageId" : { "Ref" : "CassandraImageIdParameter" },
+        "KeyName" : { "Ref" : "KeyNameParameter" },
+        "InstanceType" : { "Ref" : "InstanceTypeParameter" },
+        "NetworkInterfaces": [ {
+          "DeviceIndex": "0",
+          "PrivateIpAddress": "10.0.1.6",
+          "GroupSet": [{ "Ref" : "CassandraSG" }],
+          "SubnetId": { "Ref" : "subnetPrivate1" }
+            } ],
+        "UserData": { "Fn::Base64": { "Fn::Join": ["", [
+                        "#!/bin/bash -x\n",
+                        "export NODE_IP=`hostname -I`\n",
+                        "export SEED_LIST=\"10.0.1.6,10.0.2.6,10.0.3.6\"\n",
+                        "export CASSANDRA_YML=\"/etc/cassandra/conf/cassandra.yaml\"\n",
+                        "export CLUSTER_NAME=\"devoops_cluster\"\n",
+                        "export SNITCH_TYPE=\"Ec2Snitch\"\n",
+                        "sed -i \"/cluster_name:/c\\cluster_name: \\'${CLUSTER_NAME}\\'\"  ${CASSANDRA_YML}\n",
+                        "sed -i \"/- seeds:/c\\          - seeds: \\\"${SEED_LIST}\\\"\"     ${CASSANDRA_YML}\n",
+                        "sed -i \"/listen_address:/c\\listen_address: ${NODE_IP}\"       ${CASSANDRA_YML}\n",
+                        "sed -i \"/rpc_address:/c\\rpc_address: ${NODE_IP}\"             ${CASSANDRA_YML}\n",
+                        "sed -i \"/endpoint_snitch:/c\\endpoint_snitch: ${SNITCH_TYPE}\" ${CASSANDRA_YML}\n",
+                        "sed -i \"/authenticator: AllowAllAuthenticator/c\\authenticator: PasswordAuthenticator\" ${CASSANDRA_YML}\n",
+                        "echo 'auto_bootstrap: false' >> ${CASSANDRA_YML}\n",
+                        "service cassandra start\n"
+                        ]
+                      ]
+                  }
+              }
+      }
+    },
+    "Ec2InstanceSeed2" : {
+      "Type" : "AWS::EC2::Instance",
+      "Properties" : {
+        "ImageId" : { "Ref" : "CassandraImageIdParameter" },
+        "KeyName" : { "Ref" : "KeyNameParameter" },
+        "InstanceType" : { "Ref" : "InstanceTypeParameter" },
+        "NetworkInterfaces": [ {
+          "DeviceIndex": "0",
+          "PrivateIpAddress": "10.0.2.6",
+          "GroupSet": [{ "Ref" : "CassandraSG" }],
+          "SubnetId": { "Ref" : "subnetPrivate2" }
+            } ],
+        "UserData": { "Fn::Base64": { "Fn::Join": ["", [
+                        "#!/bin/bash -x\n",
+                        "export NODE_IP=`hostname -I`\n",
+                        "export SEED_LIST=\"10.0.1.6,10.0.2.6,10.0.3.6\"\n",
+                        "export CASSANDRA_YML=\"/etc/cassandra/conf/cassandra.yaml\"\n",
+                        "export CLUSTER_NAME=\"devoops_cluster\"\n",
+                        "export SNITCH_TYPE=\"Ec2Snitch\"\n",
+                        "sed -i \"/cluster_name:/c\\cluster_name: \\'${CLUSTER_NAME}\\'\"  ${CASSANDRA_YML}\n",
+                        "sed -i \"/- seeds:/c\\          - seeds: \\\"${SEED_LIST}\\\"\"     ${CASSANDRA_YML}\n",
+                        "sed -i \"/listen_address:/c\\listen_address: ${NODE_IP}\"       ${CASSANDRA_YML}\n",
+                        "sed -i \"/rpc_address:/c\\rpc_address: ${NODE_IP}\"             ${CASSANDRA_YML}\n",
+                        "sed -i \"/endpoint_snitch:/c\\endpoint_snitch: ${SNITCH_TYPE}\" ${CASSANDRA_YML}\n",
+                        "sed -i \"/authenticator: AllowAllAuthenticator/c\\authenticator: PasswordAuthenticator\" ${CASSANDRA_YML}\n",
+                        "echo 'auto_bootstrap: false' >> ${CASSANDRA_YML}\n",
+                        "service cassandra start\n"
+                        ]
+                      ]
+              }
+           }
+      }
+    },
+    "Ec2InstanceSeed3" : {
+      "Type" : "AWS::EC2::Instance",
+      "Properties" : {
+        "ImageId" : { "Ref" : "CassandraImageIdParameter" },
+        "KeyName" : { "Ref" : "KeyNameParameter" },
+        "InstanceType" : { "Ref" : "InstanceTypeParameter" },
+        "NetworkInterfaces": [ {
+          "DeviceIndex": "0",
+          "PrivateIpAddress": "10.0.3.6",
+          "GroupSet": [{ "Ref" : "CassandraSG" }],
+          "SubnetId": { "Ref" : "subnetPrivate3" }
+            } ],
+        "UserData": { "Fn::Base64": { "Fn::Join": ["", [
+                        "#!/bin/bash -x\n",
+                        "export NODE_IP=`hostname -I`\n",
+                        "export SEED_LIST=\"10.0.1.6,10.0.2.6,10.0.3.6\"\n",
+                        "export CASSANDRA_YML=\"/etc/cassandra/conf/cassandra.yaml\"\n",
+                        "export CLUSTER_NAME=\"devoops_cluster\"\n",
+                        "export SNITCH_TYPE=\"Ec2Snitch\"\n",
+                        "sed -i \"/cluster_name:/c\\cluster_name: \\'${CLUSTER_NAME}\\'\"  ${CASSANDRA_YML}\n",
+                        "sed -i \"/- seeds:/c\\          - seeds: \\\"${SEED_LIST}\\\"\"     ${CASSANDRA_YML}\n",
+                        "sed -i \"/listen_address:/c\\listen_address: ${NODE_IP}\"       ${CASSANDRA_YML}\n",
+                        "sed -i \"/rpc_address:/c\\rpc_address: ${NODE_IP}\"             ${CASSANDRA_YML}\n",
+                        "sed -i \"/endpoint_snitch:/c\\endpoint_snitch: ${SNITCH_TYPE}\" ${CASSANDRA_YML}\n",
+                        "sed -i \"/authenticator: AllowAllAuthenticator/c\\authenticator: PasswordAuthenticator\" ${CASSANDRA_YML}\n",
+                        "echo 'auto_bootstrap: false' >> ${CASSANDRA_YML}\n",
+                        "service cassandra start\n"
+                        ]
+                      ]
+             }
+          }
+      }
+    },
+    "DatabaseLaunchConfiguration": {
+      "Type": "AWS::AutoScaling::LaunchConfiguration",
+      "Properties": {
+        "ImageId": { "Ref" : "CassandraImageIdParameter" },
+        "InstanceType": { "Ref" : "InstanceTypeParameter" },
+        "KeyName": { "Ref" : "KeyNameParameter" },
+        "SecurityGroups": [ { "Ref" : "CassandraSG" } ],
+        "UserData": { "Fn::Base64": { "Fn::Join": ["", [
+                        "#!/bin/bash -x\n",
+                        "export NODE_IP=`hostname -I`\n",
+                        "export SEED_LIST=\"10.0.1.6,10.0.2.6,10.0.3.6\"\n",
+                        "export CASSANDRA_YML=\"/etc/cassandra/conf/cassandra.yaml\"\n",
+                        "export CLUSTER_NAME=\"devoops_cluster\"\n",
+                        "export SNITCH_TYPE=\"Ec2Snitch\"\n",
+                        "sed -i \"/cluster_name:/c\\cluster_name: \\'${CLUSTER_NAME}\\'\"  ${CASSANDRA_YML}\n",
+                        "sed -i \"/- seeds:/c\\          - seeds: \\\"${SEED_LIST}\\\"\"     ${CASSANDRA_YML}\n",
+                        "sed -i \"/listen_address:/c\\listen_address: ${NODE_IP}\"       ${CASSANDRA_YML}\n",
+                        "sed -i \"/rpc_address:/c\rpc_address: ${NODE_IP}\"             ${CASSANDRA_YML}\n",
+                        "sed -i \"/endpoint_snitch:/c\\endpoint_snitch: ${SNITCH_TYPE}\" ${CASSANDRA_YML}\n",
+                        "sed -i \"/authenticator: AllowAllAuthenticator/c\\authenticator: PasswordAuthenticator\" ${CASSANDRA_YML}\n",
+                        "echo 'auto_bootstrap: false' >> ${CASSANDRA_YML}\n",
+                        "service cassandra start\n"
+                       ]
+                     ]
+              }
+          }
+      }
+    },
+    "DatabaseAutoScalingGroup": {
+      "Type": "AWS::AutoScaling::AutoScalingGroup",
+      "Properties": {
+        "AvailabilityZones": { "Fn::GetAZs" : "" },
+        "LaunchConfigurationName": {
+          "Ref": "DatabaseLaunchConfiguration"
+        },
+        "LoadBalancerNames" : [ "Ref" : "DatabaseLoadBalancer" ],
+        "MaxSize": "3",
+        "MinSize": "3",
+        "DesiredCapacity": "3",
+        "VPCZoneIdentifier": [{ "Ref": "subnetPrivate1" }, { "Ref": "subnetPrivate2" }, { "Ref": "subnetPrivate3" }] 
+        }
+      }
+  }
+}
