@@ -455,8 +455,16 @@
                 "FromPort" : "22",
                 "ToPort" : "22",
                 "CidrIp" : "0.0.0.0/0"
-             },
-             {
+             }
+           ]
+       }
+    },
+    "DatabaseLoadBalancerSG" : {
+       "Type" : "AWS::EC2::SecurityGroup",
+       "Properties" : {
+          "GroupDescription" : "Allow access to DatabaseLoadBalancer",
+          "VpcId" : {"Ref" : "vpcMain"},
+          "SecurityGroupIngress" : [{
                 "IpProtocol" : "tcp",
                 "FromPort" : "9160",
                 "ToPort" : "9160",
@@ -496,7 +504,7 @@
             "InstanceProtocol" : "TCP"
           }],
         "Instances" : [ { "Ref" : "Ec2InstanceSeed1" }, { "Ref" : "Ec2InstanceSeed2" }, { "Ref" : "Ec2InstanceSeed3" } ],
-        "SecurityGroups": [ { "Ref" : "BastionSG" } ],
+        "SecurityGroups": [ { "Ref" : "DatabaseLoadBalancerSG" } ],
         "Subnets": [
             {
                 "Ref": "subnetPublic1"
